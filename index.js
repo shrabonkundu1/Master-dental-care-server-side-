@@ -44,7 +44,15 @@ async function run() {
       const cursor = blogCollection.find().sort({createdAt: -1}).limit(6);
       const result = await cursor.toArray();
       res.send(result);
-    })
+    });
+
+
+    // -------------Post a new blog:
+    app.post('/blogs', async(req,res) => {
+      const newBlog = req.body;
+      const result = await blogCollection.insertOne(newBlog);
+      res.send(result)
+    });
 
   } finally {
     // Ensures that the client will close when you finish/error
