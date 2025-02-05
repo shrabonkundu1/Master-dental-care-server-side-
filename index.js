@@ -47,8 +47,15 @@ async function run() {
 
     app.get('/blogs',async(req,res) => {
       const email = req.query.email;
-      const {category,search} = req.query;
-      let query = {};
+      const category = req.query.category;
+      const search = req.query.search;
+      console.log(search)
+      let query = {
+        title : {
+          $regex: search,
+          $options:'i',
+        }
+      };
       if(email) {
         query.hr_email = email;
       }
@@ -56,9 +63,9 @@ async function run() {
       if(category) {
         query.category = category;
       }
-      if(search){
-        query.$text= {$search:search};
-      }
+      // if(search){
+      //   query.$text= {$search:search};
+      // }
       const cursor = blogCollection.find(query);
       const result = await cursor.toArray();
       res.send(result)
@@ -93,7 +100,32 @@ async function run() {
 
 
     // -------------wishlist API's :
-    
+    app.post('/myWishlist', async(req,res) => {
+      const newWishlist  = req.body;
+      const result = await wishlistCollection.insertOne(newWishlist);
+      res.send(result);
+    });
+
+  //  
+  
+
+    app.get('/myWishlist' , async(req,res) => {
+      const email = req.query.email;
+      let query = {};
+      if(email){
+        query = {hr_email:email}
+      }
+      const cursor =  wishlistCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    app.delete('/myWishlist/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const result = await wishlistCollection.deleteOne(query);
+      res.send(result)
+    })
 
   } finally {
     // Ensures that the client will close when you finish/error
