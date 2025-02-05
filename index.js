@@ -11,14 +11,21 @@ app.use(express.json());
 
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jod42.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 console.log(uri)
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
+// const client = new MongoClient(uri, {
+//   serverApi: {
+//     version: ServerApiVersion.v1,
+//     strict: true,
+//     deprecationErrors: true,
+//   }
+// });
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
-    strict: true,
     deprecationErrors: true,
   }
 });
@@ -31,14 +38,44 @@ async function run() {
     // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
-    const blogCollection = client.db('dentalDB').collection('blogs')
+    const blogCollection = client.db('dentalDB').collection('blogs');
+    const wishlistCollection = client.db('dentalDB').collection('wishlist');
+
+
+    blogCollection.createIndex({ title: "text" })
 
 
     app.get('/blogs',async(req,res) => {
-      const cursor = blogCollection.find();
+      const email = req.query.email;
+      const {category,search} = req.query;
+      let query = {};
+      if(email) {
+        query.hr_email = email;
+      }
+
+      if(category) {
+        query.category = category;
+      }
+      if(search){
+        query.$text= {$search:search};
+      }
+      const cursor = blogCollection.find(query);
       const result = await cursor.toArray();
       res.send(result)
     })
+
+    // app.get('/blogs', async(req,res) => {
+    //   const {category,search} = req.query;
+    //   let query = {};
+    //   if(category) {
+    //     query.category = category;
+    //   }
+    //   if(search){
+    //     query.$text= {$search:search};
+    //   }
+    //   const result = await blogCollection.find(query)
+    //   res.send(result)
+    // })
 
     app.get('/recentBlogs',async(req,res) => {
       const cursor = blogCollection.find().sort({createdAt: -1}).limit(6);
@@ -53,6 +90,10 @@ async function run() {
       const result = await blogCollection.insertOne(newBlog);
       res.send(result)
     });
+
+
+    // -------------wishlist API's :
+    
 
   } finally {
     // Ensures that the client will close when you finish/error
