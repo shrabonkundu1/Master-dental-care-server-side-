@@ -40,6 +40,7 @@ async function run() {
 
     const blogCollection = client.db('dentalDB').collection('blogs');
     const wishlistCollection = client.db('dentalDB').collection('wishlist');
+    const commentCollection = client.db('dentalDB').collection('comments');
 
 
     blogCollection.createIndex({ title: "text" })
@@ -49,7 +50,6 @@ async function run() {
       const email = req.query.email;
       const category = req.query.category;
       const search = req.query.search;
-      console.log(search)
       let query = {
         title : {
           $regex: search,
@@ -57,19 +57,25 @@ async function run() {
         }
       };
       if(email) {
-        query.hr_email = email;
+        query = {hr_email:email};
       }
 
       if(category) {
         query.category = category;
       }
-      // if(search){
-      //   query.$text= {$search:search};
-      // }
+    
       const cursor = blogCollection.find(query);
       const result = await cursor.toArray();
       res.send(result)
     })
+
+
+    app.get('/blogs/:id', async(req,res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await blogCollection.findOne(query);
+      res.send(result);
+    });
 
     // app.get('/blogs', async(req,res) => {
     //   const {category,search} = req.query;
@@ -124,6 +130,51 @@ async function run() {
       const id = req.params.id;
       const query = {_id : new ObjectId(id)};
       const result = await wishlistCollection.deleteOne(query);
+      res.send(result)
+    });
+
+
+    // _-------------Comments Apis
+    app.post('/comments', async(req,res) => {
+      const newComment = req.body;
+      const result = await commentCollection.insertOne(newComment);
+      res.send(result)
+    });
+
+    app.get('/comments/:id', async(req,res) => {
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const result = await commentCollection.find(query).toArray();
+      res.send(result)
+    });
+
+    app.delete('comments/:id', async(req,res) => {
+      const id = req.params.id;
+      const query= {_id : new ObjectId(id)};
+      const result  = await commentCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+
+
+
+    //  -----------Update BLOg
+    app.put("/updateBlog/:id",async(req,res) => {
+      const id = req.params.id;
+      const query =  {_id: new ObjectId(id)};
+      const option = {upsert: true};
+      const updateBlogs = req.body;
+      const blogs = {
+        $set:{
+          title : updateBlogs.title,
+          photo : updateBlogs.photo,
+          description : updateBlogs.description,
+          category : updateBlogs.category,
+          deadline : updateBlogs.deadline,
+        }
+      }
+      const result = await blogCollection.updateOne(query,blogs,option);
       res.send(result)
     })
 
