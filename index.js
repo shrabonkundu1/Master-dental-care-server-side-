@@ -160,7 +160,7 @@ async function run() {
 
 
     //  -----------Update BLOg
-    app.put("/updateBlog/:id",async(req,res) => {
+    app.put("/blogs/:id",async(req,res) => {
       const id = req.params.id;
       const query =  {_id: new ObjectId(id)};
       const option = {upsert: true};
@@ -168,15 +168,30 @@ async function run() {
       const blogs = {
         $set:{
           title : updateBlogs.title,
-          photo : updateBlogs.photo,
+          blog_url : updateBlogs.blog_url,
           description : updateBlogs.description,
           category : updateBlogs.category,
-          deadline : updateBlogs.deadline,
+          blogDeadline : updateBlogs.blogDeadline,
         }
       }
       const result = await blogCollection.updateOne(query,blogs,option);
       res.send(result)
-    })
+    });
+
+    app.get('/top_post',async(req,res) => {
+      const cursor = blogCollection.aggregate([
+        {
+          $addFields: {
+            wordCount: { $size: { $split: ["$description", " "] } } 
+          }
+        },
+        { $sort: { wordCount: -1 } },
+        { $limit: 10 }, 
+        { $project: { wordCount: 0 } }
+      ]);
+        const result = await cursor.toArray();
+      res.send(result);
+    });
 
   } finally {
     // Ensures that the client will close when you finish/error
