@@ -1,12 +1,24 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 const app = express();
 require('dotenv').config();
 
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+// Middleware
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://master-dental-care.web.app',
+    'https://master-dental-care.firebaseapp.com'
+    ],
+  credentials: true
+}))
 app.use(express.json());
+app.use(cookieParser())
+
 
 
 
@@ -44,6 +56,26 @@ async function run() {
 
 
     blogCollection.createIndex({ title: "text" })
+
+
+    // Implement JWT:
+    app.post('/jwt', (req,res) => {
+      const user = req.body;
+      const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '10h'})
+      res.cookie('token', token, {
+        httpOnly:true,
+        secure: false
+      })
+      .send({success : true})
+    })
+
+    app.post('/logout', (req,res) => {
+      res.clearCookie('token',{
+        httpOnly:true,
+        secure: false
+      })
+      .send({success: true})
+    })
 
 
     app.get('/blogs',async(req,res) => {
