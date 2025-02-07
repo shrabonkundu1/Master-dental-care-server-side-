@@ -21,12 +21,30 @@ app.use(cookieParser())
 
 
 
+const verifyToken = (req,res,next) => {
+  const token  = req?.cookies?.token;
+
+  if(!token) {
+    return res.status(401).send({message: 'Unauthorized Access'})
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err,decoded) => {
+    if(err){
+      return res.status(401).send({message: 'Unauthorized Access'}) 
+    }
+    req.user  = decoded;
+    next();
+
+  })
+}
+
+
+
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jod42.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-console.log(uri)
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 // const client = new MongoClient(uri, {
 //   serverApi: {
@@ -61,10 +79,11 @@ async function run() {
     // Implement JWT:
     app.post('/jwt', (req,res) => {
       const user = req.body;
-      const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '10h'})
+      const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn: '5h'})
       res.cookie('token', token, {
         httpOnly:true,
-        secure: false
+        secure:  process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       })
       .send({success : true})
     })
@@ -72,13 +91,27 @@ async function run() {
     app.post('/logout', (req,res) => {
       res.clearCookie('token',{
         httpOnly:true,
-        secure: false
+        secure:  process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       })
       .send({success: true})
     })
 
 
-    app.get('/blogs',async(req,res) => {
+    app.get('/blogs',verifyToken ,async(req,res) => {
+      const email = req.query.email;
+      const category = req.query.category;
+      const search = req.query.search;
+      let query = {};
+      if(email) {
+        query = {hr_email:email};
+      }
+
+      const cursor = blogCollection.find(query);
+      const result = await cursor.toArray();
+      res.send(result)
+    })
+    app.get('/allBlogs' ,async(req,res) => {
       const email = req.query.email;
       const category = req.query.category;
       const search = req.query.search;
@@ -91,6 +124,7 @@ async function run() {
       if(email) {
         query = {hr_email:email};
       }
+      
 
       if(category) {
         query.category = category;
@@ -102,6 +136,7 @@ async function run() {
     })
 
 
+    // blog details
     app.get('/blogs/:id', async(req,res) => {
       const id = req.params.id;
       const query = {_id: new ObjectId(id)};
@@ -109,18 +144,6 @@ async function run() {
       res.send(result);
     });
 
-    // app.get('/blogs', async(req,res) => {
-    //   const {category,search} = req.query;
-    //   let query = {};
-    //   if(category) {
-    //     query.category = category;
-    //   }
-    //   if(search){
-    //     query.$text= {$search:search};
-    //   }
-    //   const result = await blogCollection.find(query)
-    //   res.send(result)
-    // })
 
     app.get('/recentBlogs',async(req,res) => {
       const cursor = blogCollection.find().sort({createdAt: -1}).limit(6);
@@ -130,7 +153,7 @@ async function run() {
 
 
     // -------------Post a new blog:
-    app.post('/blogs', async(req,res) => {
+    app.post('/blogs',verifyToken, async(req,res) => {
       const newBlog = req.body;
       const result = await blogCollection.insertOne(newBlog);
       res.send(result)
@@ -147,11 +170,14 @@ async function run() {
   //  
   
 
-    app.get('/myWishlist' , async(req,res) => {
+    app.get('/myWishlist' ,verifyToken, async(req,res) => {
       const email = req.query.email;
       let query = {};
       if(email){
         query = {hr_email:email}
+      }
+      if(req.user.email !== req.query.email){
+        return res.status(403).send({message: 'Forbidden access'})
       }
       const cursor =  wishlistCollection.find(query);
       const result = await cursor.toArray();
@@ -175,12 +201,12 @@ async function run() {
 
     app.get('/comments/:id', async(req,res) => {
       const id = req.params.id;
-      const query = {_id : new ObjectId(id)};
+      const query = {blog_id : id};
       const result = await commentCollection.find(query).toArray();
       res.send(result)
     });
 
-    app.delete('comments/:id', async(req,res) => {
+    app.delete('/comments/:id', async(req,res) => {
       const id = req.params.id;
       const query= {_id : new ObjectId(id)};
       const result  = await commentCollection.deleteOne(query);
